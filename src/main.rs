@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate glob;
 extern crate reqwest;
+extern crate rust_decimal;
 extern crate select;
 
 #[macro_use]
@@ -11,11 +12,16 @@ extern crate serde_yaml;
 use chrono::NaiveDate;
 use glob::glob;
 
+use rust_decimal::Decimal;
 use select::document::Document;
 use select::predicate::{Attr, Class, Name, Predicate};
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::fs::File;
+use std::str::FromStr;
+use std::io::prelude::*;
+
 
 //https://stackoverflow.com/a/28392068/68115
 macro_rules! btreemap {
@@ -28,12 +34,7 @@ macro_rules! btreemap {
 
 fn main() {
   let path = "/home/rob/git/grenade/crypto-market-data";
-  //coin_market_cap_all_today("https://coinmarketcap.com/all/views/all/", &path);
-  /*
-  if std::path::Path::new(&format!("{}/history", path)).exists() {
-    fs::remove_dir_all(format!("{}/history", path)).expect("unable to delete directory");
-  }
-  */
+  coin_market_cap_all_today("https://coinmarketcap.com/all/views/all/", &path);
   for file in glob(&format!("{}/today/json/*.json", &path)).expect("unable to interpret glob pattern") {
     let id = file.as_ref().unwrap().file_stem().unwrap().to_str().unwrap();
     if std::path::Path::new(&format!("{}/history/json/{}.json", &path, &id)).exists() {
@@ -190,26 +191,29 @@ fn coin_market_cap_history(id: &str, url: &str, path: &str) {
 }
 
 fn first<T>(v: &Vec<T>) -> Option<&T> {
-    v.first()
+  v.first()
 }
 
 fn last<T>(v: &Vec<T>) -> Option<&T> {
-    v.last()
+  v.last()
 }
 
 /*
-fn write_to_file(content: &str, path: &str) {
-  match &path[path.len-4..] {
-    "json" => {
-      let json = serde_json::to_string_pretty(content).unwrap();
-      fs::write(path, &json).expect("unable to write json file");
-    }
-    "yaml" => {
-      let yaml = serde_yaml::to_string(content).unwrap();
-      fs::write(path, &yaml).expect("unable to write yaml file");
-    }
-    println!("{} written",  path);
+fn build_daily_charts(path: &str) {
+  for path in glob(&format!("{}/history/json/bitcoin.json", &path)).expect("unable to interpret glob pattern") {
+    let mut file = fs::File::open(path);
+    let mut contents = String::new();
+    file.read_to_string(&mut contents);
+    let v: Vec<BTreeMap<str, Value>> = serde_json::from_str(contents).unwrap();
   }
+  
+  /*
+  let mut dt = dt0;
+  while dt <= dt1 {
+    println!("{:?}", dt);
+    dt = dt + Duration::days(1);
+  }
+  */
 }
 */
 
@@ -234,3 +238,14 @@ struct Value {
   as_string: String,
   as_formatted_string: String,
 }
+
+/*
+#[derive(Debug, Serialize, Deserialize)]
+struct CryptoDay {
+  date: NaiveDate,
+  id: String,
+  cap: i64,
+  high: Decimal,
+  low: Decimal,
+}
+*/
