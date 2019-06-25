@@ -9,13 +9,13 @@ extern crate serde_yaml;
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 
 //https://stackoverflow.com/a/28392068/68115
-macro_rules! hashmap {
+macro_rules! btreemap {
   ($( $key: expr => $val: expr ),*) => {{
-    let mut map = ::std::collections::HashMap::new();
+    let mut map = ::std::collections::BTreeMap::new();
     $( map.insert($key, $val); )*
     map
   }}
@@ -42,7 +42,7 @@ fn coin_market_cap(url: &str, path: &str) {
     let market_cap = row.find(Class("market-cap")).next().unwrap();
     let price = row.find(Class("price")).next().unwrap();
     let volume = row.find(Class("volume")).next().unwrap();
-    let mut percent_change = HashMap::with_capacity(3);
+    let mut percent_change = BTreeMap::new();
     for cell in row.find(Class("percent-change")) {
       percent_change.insert(cell.attr("data-timespan").unwrap().to_string(), cell.attr("data-percentusd").unwrap().to_string());
     }
@@ -52,10 +52,10 @@ fn coin_market_cap(url: &str, path: &str) {
       rank: row.find(Class("text-center")).next().unwrap().text().trim().to_string().parse::<i32>().unwrap(),
       symbol: symbol.to_string(),
       name: row.find(Class("currency-name")).next().unwrap().attr("data-sort").unwrap().to_string(),
-      market_cap: hashmap!["BTC".to_string() => market_cap.attr("data-btc").unwrap().to_string().replace("?", ""), "USD".to_string() => market_cap.attr("data-usd").unwrap().to_string().replace("?", "")],
-      price: hashmap!["BTC".to_string() => price.attr("data-btc").unwrap().to_string(), "USD".to_string() => price.attr("data-usd").unwrap().to_string()],
-      volume: hashmap!["BTC".to_string() => volume.attr("data-btc").unwrap().to_string().replace("None", "0"), "USD".to_string() => volume.attr("data-usd").unwrap().to_string().replace("None", "0")],
-      supply: hashmap![symbol.to_string() => row.find(Class("circulating-supply")).next().unwrap().attr("data-sort").unwrap().to_string().replace("-1", "0")],
+      market_cap: btreemap!["BTC".to_string() => market_cap.attr("data-btc").unwrap().to_string().replace("?", ""), "USD".to_string() => market_cap.attr("data-usd").unwrap().to_string().replace("?", "")],
+      price: btreemap!["BTC".to_string() => price.attr("data-btc").unwrap().to_string(), "USD".to_string() => price.attr("data-usd").unwrap().to_string()],
+      volume: btreemap!["BTC".to_string() => volume.attr("data-btc").unwrap().to_string().replace("None", "0"), "USD".to_string() => volume.attr("data-usd").unwrap().to_string().replace("None", "0")],
+      supply: btreemap![symbol.to_string() => row.find(Class("circulating-supply")).next().unwrap().attr("data-sort").unwrap().to_string().replace("-1", "0")],
       change: percent_change,
       is_mineable: row.find(Class("circulating-supply")).next().unwrap().text().trim().chars().last().unwrap() != '*',
     };
@@ -93,10 +93,10 @@ struct Crypto {
   rank: i32,
   symbol: String,
   name: String,
-  market_cap: HashMap<String, String>,
-  price: HashMap<String, String>,
-  volume: HashMap<String, String>,
-  supply: HashMap<String, String>,
-  change: HashMap<String, String>,
+  market_cap: BTreeMap<String, String>,
+  price: BTreeMap<String, String>,
+  volume: BTreeMap<String, String>,
+  supply: BTreeMap<String, String>,
+  change: BTreeMap<String, String>,
   is_mineable: bool,
 }
