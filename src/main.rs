@@ -34,16 +34,17 @@ macro_rules! btreemap {
 
 fn main() {
   let path = "/home/rob/git/grenade/crypto-market-data";
-  coin_market_cap_all_today("https://coinmarketcap.com/all/views/all/", &path);
-  for file in glob(&format!("{}/today/json/*.json", &path)).expect("unable to interpret glob pattern") {
-    let id = file.as_ref().unwrap().file_stem().unwrap().to_str().unwrap();
-    if std::path::Path::new(&format!("{}/history/json/{}.json", &path, &id)).exists() {
-      println!("skipping history for {}",  &id);
-    } else {
-      coin_market_cap_history(&id, &format!("https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end=20190625", &id), &path);
-      std::thread::sleep(std::time::Duration::from_secs(6));
-    }
-  }
+  //coin_market_cap_all_today("https://coinmarketcap.com/all/views/all/", &path);
+  //for file in glob(&format!("{}/today/json/*.json", &path)).expect("unable to interpret glob pattern") {
+  //  let id = file.as_ref().unwrap().file_stem().unwrap().to_str().unwrap();
+  //  if std::path::Path::new(&format!("{}/history/json/{}.json", &path, &id)).exists() {
+  //    println!("skipping history for {}",  &id);
+  //  } else {
+  //    coin_market_cap_history(&id, &format!("https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end=20190625", &id), &path);
+  //    std::thread::sleep(std::time::Duration::from_secs(6));
+  //  }
+  //}
+  build_daily_rankings(path)
 }
 
 fn coin_market_cap_all_today(url: &str, path: &str) {
@@ -109,32 +110,32 @@ fn coin_market_cap_all_today(url: &str, path: &str) {
   let json_all = serde_json::to_string_pretty(&all).unwrap();
   let json_all_path = format!("{}/today/all.json", path);
   fs::write(&json_all_path, &json_all).expect("unable to write json file");
-  println!("{} updated",  json_all_path);
+  println!("{} updated", json_all_path);
   
   let yaml_all = serde_yaml::to_string(&all).unwrap();
   let yaml_all_path = format!("{}/today/all.yaml", path);
   fs::write(&yaml_all_path, &yaml_all).expect("unable to write yaml file");
-  println!("{} updated",  yaml_all_path);
+  println!("{} updated", yaml_all_path);
 
   let json_top_10 = serde_json::to_string_pretty(&all[..10]).unwrap();
   let json_top_10_path = format!("{}/today/top-10.json", path);
   fs::write(&json_top_10_path, &json_top_10).expect("unable to write json file");
-  println!("{} updated",  json_top_10_path);
+  println!("{} updated", json_top_10_path);
   
   let yaml_top_10 = serde_yaml::to_string(&all[..10]).unwrap();
   let yaml_top_10_path = format!("{}/today/top-10.yaml", path);
   fs::write(&yaml_top_10_path, &yaml_top_10).expect("unable to write yaml file");
-  println!("{} updated",  yaml_top_10_path);
+  println!("{} updated", yaml_top_10_path);
 
   let json_top_100 = serde_json::to_string_pretty(&all[..100]).unwrap();
   let json_top_100_path = format!("{}/today/top-100.json", path);
   fs::write(&json_top_100_path, &json_top_100).expect("unable to write json file");
-  println!("{} updated",  json_top_100_path);
+  println!("{} updated", json_top_100_path);
   
   let yaml_top_100 = serde_yaml::to_string(&all[..100]).unwrap();
   let yaml_top_100_path = format!("{}/today/top-100.yaml", path);
   fs::write(&yaml_top_100_path, &yaml_top_100).expect("unable to write yaml file");
-  println!("{} updated",  yaml_top_100_path);
+  println!("{} updated", yaml_top_100_path);
 }
 
 fn coin_market_cap_history(id: &str, url: &str, path: &str) {
@@ -198,24 +199,75 @@ fn last<T>(v: &Vec<T>) -> Option<&T> {
   v.last()
 }
 
-/*
-fn build_daily_charts(path: &str) {
-  for path in glob(&format!("{}/history/json/bitcoin.json", &path)).expect("unable to interpret glob pattern") {
-    let mut file = fs::File::open(path);
+fn build_daily_rankings(path: &str) {
+  for coin_history_path in glob(&format!("{}/history/json/*.json", &path)).expect("unable to interpret glob pattern") {
+    let mut file = fs::File::open(coin_history_path.as_ref().unwrap()).expect("unable to open file");
     let mut contents = String::new();
     file.read_to_string(&mut contents);
-    let v: Vec<BTreeMap<str, Value>> = serde_json::from_str(contents).unwrap();
+    let coin_history: Vec<BTreeMap<String, Value>> = serde_json::from_str(&contents).unwrap();
+    let id = coin_history_path.as_ref().unwrap().file_stem().unwrap().to_str().unwrap().to_string();
+    for day in &coin_history {
+      for format in vec!["json", "yaml"].iter() {
+        fs::create_dir_all(format!("{}/{}/{}", path, &day["date_raw"].as_string, format)).expect("unable to create directory");
+      }
+      //println!("cap: {}", &day["market_cap"].as_string);
+      //println!("high: {}", &day["high"].as_string);
+      //println!("low: {}", &day["low"].as_string);
+      let crypto_day = CryptoDay {
+        date: day["date_raw"].as_string.clone(),
+        id: id.clone(),
+        cap: if day["market_cap"].as_string.chars().any(|x| x == 'e') {
+          Decimal::from_scientific(&day["market_cap"].as_string).unwrap()
+        } else if day["market_cap"].as_string.parse::<f64>().is_ok() {
+          Decimal::from_str(&day["market_cap"].as_string).unwrap()
+        } else {
+          Decimal::new(-1, 0)
+        },
+        high: if day["high"].as_string.chars().any(|x| x == 'e') {
+          Decimal::from_scientific(&day["high"].as_string).unwrap()
+        } else if day["high"].as_string.parse::<f64>().is_ok() {
+          Decimal::from_str(&day["high"].as_string).unwrap()
+        } else {
+          Decimal::new(-1, 0)
+        },
+        low: if day["low"].as_string.chars().any(|x| x == 'e') {
+          Decimal::from_scientific(&day["low"].as_string).unwrap()
+        } else if day["low"].as_string.parse::<f64>().is_ok() {
+          Decimal::from_str(&day["low"].as_string).unwrap()
+        } else {
+          Decimal::new(-1, 0)
+        },
+      };
+      //println!("{:?}",  &crypto_day);
+      let json_all_rankings_path = format!("{}/{}/json/all.json", path, &day["date_raw"].as_string);
+      let yaml_all_rankings_path = format!("{}/{}/yaml/all.yaml", path, &day["date_raw"].as_string);
+      let mut all_rankings: Vec<CryptoDay>;
+      if std::path::Path::new(&json_all_rankings_path).exists() {
+        let mut json_all_rankings_file = fs::File::open(&json_all_rankings_path).expect("unable to open file");
+        let mut json_all_rankings_contents = String::new();
+        json_all_rankings_file.read_to_string(&mut json_all_rankings_contents);
+        all_rankings = serde_json::from_str(&json_all_rankings_contents).unwrap();
+        if all_rankings.iter().any(|x| x.id == id) {
+          let remove_index = all_rankings.iter().position(|x| x.id == id).unwrap();
+          all_rankings.remove(remove_index);
+        }
+        all_rankings.push(crypto_day);
+      } else {
+        all_rankings = vec![crypto_day];
+      }
+      all_rankings.sort_by(|a, b| b.cap.cmp(&a.cap));
+
+      let json_all_rankings = serde_json::to_string_pretty(&all_rankings).unwrap();
+      fs::write(&json_all_rankings_path, &json_all_rankings).expect("unable to write json file");
+      //println!("{} updated", json_all_rankings_path);
+      
+      let yaml_all_rankings = serde_yaml::to_string(&all_rankings).unwrap();
+      fs::write(&yaml_all_rankings_path, &yaml_all_rankings).expect("unable to write yaml file");
+      //println!("{} updated", yaml_all_rankings_path);
+    }
+    println!("{} daily {} rankings updated: {} - {}", &coin_history.len(), id, last(&coin_history).unwrap()["date_raw"].as_string, first(&coin_history).unwrap()["date_raw"].as_string);
   }
-  
-  /*
-  let mut dt = dt0;
-  while dt <= dt1 {
-    println!("{:?}", dt);
-    dt = dt + Duration::days(1);
-  }
-  */
 }
-*/
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -239,13 +291,11 @@ struct Value {
   as_formatted_string: String,
 }
 
-/*
 #[derive(Debug, Serialize, Deserialize)]
 struct CryptoDay {
-  date: NaiveDate,
+  date: String,
   id: String,
-  cap: i64,
+  cap: Decimal,
   high: Decimal,
   low: Decimal,
 }
-*/
