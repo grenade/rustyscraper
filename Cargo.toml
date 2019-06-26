@@ -6,6 +6,7 @@ authors = [ "rob thijssen <rthijssen@gmail.com>" ]
 [dependencies]
 chrono = "^0.4"
 glob = "^0.3"
+rand = "^0.6"
 reqwest = "^0.9"
 rust_decimal = "^1.0"
 select = "^0.4"

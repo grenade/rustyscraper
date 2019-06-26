@@ -1,5 +1,6 @@
 extern crate chrono;
 extern crate glob;
+extern crate rand;
 extern crate reqwest;
 extern crate rust_decimal;
 extern crate select;
@@ -11,16 +12,10 @@ extern crate serde_yaml;
 
 use chrono::NaiveDate;
 use glob::glob;
-
+use rand::{thread_rng, seq::SliceRandom};
 use rust_decimal::Decimal;
-use select::document::Document;
-use select::predicate::{Attr, Class, Name, Predicate};
-
-use std::collections::BTreeMap;
-use std::fs;
-use std::fs::File;
-use std::str::FromStr;
-use std::io::prelude::*;
+use select::{document::Document, predicate::{Attr, Class, Name, Predicate}};
+use std::{collections::BTreeMap, fs, fs::File, path::PathBuf, str::FromStr, io::prelude::*};
 
 
 //https://stackoverflow.com/a/28392068/68115
@@ -200,12 +195,18 @@ fn last<T>(v: &Vec<T>) -> Option<&T> {
 }
 
 fn build_daily_rankings(path: &str) {
-  for coin_history_path in glob(&format!("{}/history/json/*.json", &path)).expect("unable to interpret glob pattern") {
-    let mut file = fs::File::open(coin_history_path.as_ref().unwrap()).expect("unable to open file");
+  let mut coin_history_paths: Vec<PathBuf> = glob(&format!("{}/history/json/*.json", &path)).expect("unable to interpret glob pattern").map(|x| x.unwrap()).collect();
+  coin_history_paths.shuffle(&mut thread_rng());
+  let coin_count = coin_history_paths.len();
+  let mut coin_index = 0;
+  for coin_history_path in coin_history_paths {
+    coin_index += 1;
+    let mut file = fs::File::open(&coin_history_path).expect("unable to open file");
     let mut contents = String::new();
     file.read_to_string(&mut contents);
     let coin_history: Vec<BTreeMap<String, Value>> = serde_json::from_str(&contents).unwrap();
-    let id = coin_history_path.as_ref().unwrap().file_stem().unwrap().to_str().unwrap().to_string();
+    let id = coin_history_path.file_stem().unwrap().to_str().unwrap().to_string();
+    println!("processing {} days of coin history for {} ({}/{})", &coin_history.len(), id, coin_index, coin_count);
     for day in &coin_history {
       for format in vec!["json", "yaml"].iter() {
         fs::create_dir_all(format!("{}/{}/{}", path, &day["date_raw"].as_string, format)).expect("unable to create directory");
@@ -265,7 +266,7 @@ fn build_daily_rankings(path: &str) {
       fs::write(&yaml_all_rankings_path, &yaml_all_rankings).expect("unable to write yaml file");
       //println!("{} updated", yaml_all_rankings_path);
     }
-    println!("{} daily {} rankings updated: {} - {}", &coin_history.len(), id, last(&coin_history).unwrap()["date_raw"].as_string, first(&coin_history).unwrap()["date_raw"].as_string);
+    println!("daily {} rankings updated: {} - {}", id, last(&coin_history).unwrap()["date_raw"].as_string, first(&coin_history).unwrap()["date_raw"].as_string);
   }
 }
 
