@@ -195,7 +195,7 @@ fn last<T>(v: &Vec<T>) -> Option<&T> {
 }
 
 fn build_daily_rankings(path: &str) {
-  let mut coin_history_paths: Vec<PathBuf> = glob(&format!("{}/history/json/*.json", &path)).expect("unable to interpret glob pattern").map(|x| x.unwrap()).collect();
+  let mut coin_history_paths: Vec<PathBuf> = glob(&format!("{}/history/json/[a-m]*.json", &path)).expect("unable to interpret glob pattern").map(|x| x.unwrap()).collect();
   coin_history_paths.shuffle(&mut thread_rng());
   let coin_count = coin_history_paths.len();
   let mut coin_index = 0;
@@ -208,9 +208,7 @@ fn build_daily_rankings(path: &str) {
     let id = coin_history_path.file_stem().unwrap().to_str().unwrap().to_string();
     println!("processing {} days of coin history for {} ({}/{})", &coin_history.len(), id, coin_index, coin_count);
     for day in &coin_history {
-      for format in vec!["json", "yaml"].iter() {
-        fs::create_dir_all(format!("{}/{}/{}", path, &day["date_raw"].as_string, format)).expect("unable to create directory");
-      }
+      fs::create_dir_all(&format!("{}/{}/{}/{}", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10])).expect("unable to create directory");
       //println!("cap: {}", &day["market_cap"].as_string);
       //println!("high: {}", &day["high"].as_string);
       //println!("low: {}", &day["low"].as_string);
@@ -240,8 +238,8 @@ fn build_daily_rankings(path: &str) {
         },
       };
       //println!("{:?}",  &crypto_day);
-      let json_all_rankings_path = format!("{}/{}/json/all.json", path, &day["date_raw"].as_string);
-      let yaml_all_rankings_path = format!("{}/{}/yaml/all.yaml", path, &day["date_raw"].as_string);
+      let json_all_rankings_path = format!("{}/{}/{}/{}/all.json", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
+      let yaml_all_rankings_path = format!("{}/{}/{}/{}/all.yaml", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
       let mut all_rankings: Vec<CryptoDay>;
       if std::path::Path::new(&json_all_rankings_path).exists() {
         let mut json_all_rankings_file = fs::File::open(&json_all_rankings_path).expect("unable to open file");
@@ -260,11 +258,27 @@ fn build_daily_rankings(path: &str) {
 
       let json_all_rankings = serde_json::to_string_pretty(&all_rankings).unwrap();
       fs::write(&json_all_rankings_path, &json_all_rankings).expect("unable to write json file");
-      //println!("{} updated", json_all_rankings_path);
       
       let yaml_all_rankings = serde_yaml::to_string(&all_rankings).unwrap();
       fs::write(&yaml_all_rankings_path, &yaml_all_rankings).expect("unable to write yaml file");
-      //println!("{} updated", yaml_all_rankings_path);
+
+
+      let json_top10_rankings_path = format!("{}/{}/{}/{}/top-10.json", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
+      let json_top10_rankings = serde_json::to_string_pretty(&all_rankings[..std::cmp::min(10, all_rankings.len()-1)]).unwrap();
+      fs::write(&json_top10_rankings_path, &json_top10_rankings).expect("unable to write json file");
+      
+      let yaml_top10_rankings_path = format!("{}/{}/{}/{}/top-10.yaml", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
+      let yaml_top10_rankings = serde_yaml::to_string(&all_rankings[..std::cmp::min(10, all_rankings.len()-1)]).unwrap();
+      fs::write(&yaml_top10_rankings_path, &yaml_top10_rankings).expect("unable to write yaml file");
+
+
+      let json_top100_rankings_path = format!("{}/{}/{}/{}/top-100.json", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
+      let json_top100_rankings = serde_json::to_string_pretty(&all_rankings[..std::cmp::min(100, all_rankings.len()-1)]).unwrap();
+      fs::write(&json_top100_rankings_path, &json_top100_rankings).expect("unable to write json file");
+      
+      let yaml_top100_rankings_path = format!("{}/{}/{}/{}/top-100.yaml", path, &day["date_raw"].as_string[..4], &day["date_raw"].as_string[5..7], &day["date_raw"].as_string[8..10]);
+      let yaml_top100_rankings = serde_yaml::to_string(&all_rankings[..std::cmp::min(100, all_rankings.len()-1)]).unwrap();
+      fs::write(&yaml_top100_rankings_path, &yaml_top100_rankings).expect("unable to write yaml file");
     }
     println!("daily {} rankings updated: {} - {}", id, last(&coin_history).unwrap()["date_raw"].as_string, first(&coin_history).unwrap()["date_raw"].as_string);
   }
